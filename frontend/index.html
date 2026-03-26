@@ -871,7 +871,9 @@ footer::before{
 </footer>
 
 <script>
-const API = 'http://localhost:8000';
+const DEPLOYED_URL = 'https://toxpredict.onrender.com';
+const API = DEPLOYED_URL || 'http://localhost:8000';
+
 
 // ── SMILES DRAWER (2D) ───────────────────────────────────────────────────────
 let sd2d = null;
