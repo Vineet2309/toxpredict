@@ -2,20 +2,17 @@
 main.py
 ───────
 FastAPI application for ToxPredict.
+Designed for Render.com free tier:
+  - Port binds IMMEDIATELY (models load in background thread)
+  - GNN is optional — works fine with XGBoost only
+  - No torch/PyG import at module level (avoids slow import on startup)
 
-Routes:
-  GET  /health          — health check, confirms models are loaded
-  GET  /assays          — metadata for all 12 Tox21 assay targets
-  POST /predict         — single SMILES → toxicity prediction
-  POST /batch           — list of SMILES → batch predictions
-  POST /upload-batch    — CSV file upload → batch predictions
-
-Run with:
-  uvicorn api.main:app --reload --port 8000
+Start with:  python run.py
 """
 
 import sys
 import json
+import threading
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -25,9 +22,11 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+# ── Resolve paths ─────────────────────────────────────────────────────────────
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(_ROOT))
 sys.path.append(str(_ROOT / "src"))
+
 from config import (
     TOX21_TASKS,
     ASSAY_INFO,
@@ -52,53 +51,51 @@ from api.schemas import (
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MODEL REGISTRY  —  loaded once at startup, shared across all requests
+# MODEL REGISTRY
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ModelRegistry:
-    """
-    Holds all loaded models and feature metadata.
-    Loaded once during startup via the lifespan context manager.
-    Using a class (instead of globals) keeps things clean and testable.
-    """
-    xgb_models:   Optional[Dict]  = None   # {task: XGBClassifier}
-    gnn_model:    Optional[object]= None   # ToxAttentiveFP
-    feat_names:   Optional[List]  = None   # feature name list for SHAP
-    top_features: Optional[Dict]  = None   # pre-computed SHAP summary
-    device:       Optional[object]= None   # torch device
-    gnn_params:   Optional[Dict]  = None   # GNN architecture params
-
+    xgb_models:   Optional[Dict] = None
+    gnn_model:    Optional[object] = None
+    feat_names:   Optional[List] = None
+    top_features: Optional[Dict] = None
+    device:       Optional[object] = None
+    loading:      bool = False
+    ready:        bool = False
 
 registry = ModelRegistry()
 
 
 def _load_xgb():
-    """Load XGBoost models and feature metadata from disk."""
+    """Load XGBoost models from disk."""
     try:
         import joblib
         registry.xgb_models = joblib.load(XGB_MODEL_PATH)
-        logger.info(f"XGBoost models loaded  ({len(registry.xgb_models)} tasks)")
+        logger.info(f"XGBoost loaded — {len(registry.xgb_models)} tasks")
 
         feat_path = MODELS_DIR / "feature_names.json"
         if feat_path.exists():
             with open(feat_path) as f:
                 registry.feat_names = json.load(f)
-            logger.info(f"Feature names loaded  ({len(registry.feat_names)} features)")
+            logger.info(f"Feature names loaded — {len(registry.feat_names)} features")
 
         top_path = MODELS_DIR / "xgb_top_features.json"
         if top_path.exists():
             with open(top_path) as f:
                 registry.top_features = json.load(f)
-            logger.info("Pre-computed SHAP top features loaded")
+            logger.info("SHAP top features loaded")
 
     except FileNotFoundError:
-        logger.warning(f"XGBoost model not found at {XGB_MODEL_PATH} — train first")
+        logger.warning(f"XGBoost model not found at {XGB_MODEL_PATH}")
     except Exception as e:
-        logger.error(f"Failed to load XGBoost: {e}")
+        logger.error(f"XGBoost load error: {e}")
 
 
 def _load_gnn():
-    """Load AttentiveFP GNN model from checkpoint."""
+    """Load GNN model — optional, skipped gracefully if not available."""
+    if not GNN_MODEL_PATH.exists():
+        logger.info("GNN model not found — skipping (XGBoost only mode)")
+        return
     try:
         import torch
         from train_gnn import ToxAttentiveFP
@@ -107,59 +104,55 @@ def _load_gnn():
         registry.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
-
         checkpoint = torch.load(
             GNN_MODEL_PATH,
             map_location=registry.device,
             weights_only=False,
         )
         params = checkpoint.get("gnn_params", {})
-        params.update({
-            "in_channels": ATOM_FEATURE_DIM,
-            "edge_dim":    BOND_FEATURE_DIM,
-        })
-        registry.gnn_params = params
+        params.update({"in_channels": ATOM_FEATURE_DIM, "edge_dim": BOND_FEATURE_DIM})
 
         model = ToxAttentiveFP(**params).to(registry.device)
         model.load_state_dict(checkpoint["model_state"])
         model.eval()
         registry.gnn_model = model
+        logger.info(f"GNN loaded — epoch {checkpoint.get('epoch','?')} on {registry.device}")
 
-        logger.info(f"GNN model loaded  (device={registry.device}, "
-                    f"epoch={checkpoint.get('epoch', '?')})")
-
-    except FileNotFoundError:
-        logger.warning(f"GNN model not found at {GNN_MODEL_PATH} — train first")
     except Exception as e:
-        logger.error(f"Failed to load GNN: {e}")
+        logger.warning(f"GNN load skipped: {e}")
+
+
+def _load_all_models():
+    """Called in background thread — loads everything then marks ready."""
+    registry.loading = True
+    logger.info("Background thread: loading models...")
+    _load_xgb()
+    _load_gnn()
+    registry.loading = False
+    registry.ready   = True
+    logger.info("All models ready.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LIFESPAN  —  startup / shutdown
+# LIFESPAN  — port binds BEFORE models finish loading
 # ─────────────────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Load models in a background thread so the port binds immediately.
-    Render.com times out if startup blocks the port for > 60s.
-    Models will be ready within a few seconds of the first request.
+    Yield immediately so uvicorn binds the port right away.
+    Models load in a daemon background thread.
+
+    This is critical for Render.com — it scans for an open port
+    within seconds of process start. If we block here (loading models),
+    Render times out and kills the process.
     """
-    import threading
-    logger.info("ToxPredict API starting — port binding now...")
-
-    def _load_all():
-        logger.info("Background: loading models...")
-        _load_xgb()
-        _load_gnn()
-        logger.info("Background: all models ready.")
-
-    t = threading.Thread(target=_load_all, daemon=True)
+    logger.info("ToxPredict API — starting, port will bind now...")
+    t = threading.Thread(target=_load_all_models, daemon=True)
     t.start()
-
-    logger.info("Port bound. Models loading in background.")
+    logger.info("Background model loading started. Port is open.")
     yield
-    logger.info("Shutting down ToxPredict API.")
+    logger.info("ToxPredict API shutting down.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -169,15 +162,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title       = API_TITLE,
     version     = API_VERSION,
-    description = (
-        "Drug toxicity prediction across 12 Tox21 assay targets. "
-        "Supports XGBoost (with SHAP explainability) and "
-        "AttentiveFP GNN (with atom-level attention heatmaps)."
-    ),
+    description = "Drug toxicity prediction across 12 Tox21 assay targets.",
     lifespan    = lifespan,
 )
 
-# CORS — allows the HTML frontend to call this API from any origin
 app.add_middleware(
     CORSMiddleware,
     allow_origins     = ["*"],
@@ -192,22 +180,15 @@ app.add_middleware(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _risk_level(prob: float) -> str:
-    """Convert probability to a risk tier for the frontend."""
-    if prob >= 0.65:
-        return "high"
-    if prob >= 0.35:
-        return "medium"
+    if prob >= 0.65: return "high"
+    if prob >= 0.35: return "medium"
     return "low"
-
 
 def _overall_risk(n_toxic: int, n_tasks: int) -> str:
     ratio = n_toxic / max(n_tasks, 1)
-    if ratio >= 0.4:
-        return "high"
-    if ratio >= 0.15:
-        return "medium"
+    if ratio >= 0.4:  return "high"
+    if ratio >= 0.15: return "medium"
     return "low"
-
 
 def _canonical(smiles: str) -> Optional[str]:
     try:
@@ -217,9 +198,7 @@ def _canonical(smiles: str) -> Optional[str]:
     except Exception:
         return None
 
-
 def _build_assay_results(predictions: Dict) -> List[AssayResult]:
-    """Convert raw predictions dict → list of AssayResult objects."""
     results = []
     for task in TOX21_TASKS:
         if task not in predictions:
@@ -237,122 +216,61 @@ def _build_assay_results(predictions: Dict) -> List[AssayResult]:
         ))
     return results
 
-
-def _build_shap_response(
-    shap_top: Dict,
-) -> Dict[str, List[ShapFeature]]:
-    out = {}
-    for task, features in shap_top.items():
-        out[task] = [
-            ShapFeature(
-                feature    = f["feature"],
-                shap_value = f["shap_value"],
-            )
-            for f in features
-        ]
-    return out
-
-
-def _build_atom_attention(weights: List[float]) -> List[AtomAttention]:
-    return [
-        AtomAttention(atom_idx=i, weight=round(w, 4))
-        for i, w in enumerate(weights)
-    ]
-
-
-def _predict_with_gnn(smiles: str) -> PredictResponse:
-    from train_gnn import predict_single_gnn
-
-    result = predict_single_gnn(
-        smiles,
-        registry.gnn_model,
-        registry.device,
-    )
-    assay_results = _build_assay_results(result["predictions"])
-    n_toxic       = sum(1 for r in assay_results if r.toxic)
-
-    return PredictResponse(
-        smiles           = smiles,
-        canonical_smiles = _canonical(smiles),
-        model_used       = "gnn",
-        assay_results    = assay_results,
-        n_toxic          = n_toxic,
-        overall_risk     = _overall_risk(n_toxic, len(assay_results)),
-        shap_features    = None,
-        atom_attention   = _build_atom_attention(result.get("atom_attention", [])),
-    )
-
-
-def _predict_with_xgb(smiles: str) -> PredictResponse:
-    from train_xgb import predict_single
-
-    if registry.xgb_models is None:
-        raise HTTPException(503, "XGBoost model not loaded")
-    if registry.feat_names is None:
-        raise HTTPException(503, "Feature names not loaded")
-
-    result = predict_single(
-        smiles,
-        registry.xgb_models,
-        registry.feat_names,
-    )
-    assay_results = _build_assay_results(result["predictions"])
-    n_toxic       = sum(1 for r in assay_results if r.toxic)
-
-    return PredictResponse(
-        smiles           = smiles,
-        canonical_smiles = _canonical(smiles),
-        model_used       = "xgb",
-        assay_results    = assay_results,
-        n_toxic          = n_toxic,
-        overall_risk     = _overall_risk(n_toxic, len(assay_results)),
-        shap_features    = _build_shap_response(result.get("shap_top", {})),
-        atom_attention   = None,
-    )
+def _check_models_ready(model_type: str = "xgb"):
+    """Raise 503 with helpful message if models aren't loaded yet."""
+    if registry.loading and not registry.ready:
+        raise HTTPException(
+            status_code = 503,
+            detail      = "Models are still loading (usually takes 20-30s after startup). Please retry shortly."
+        )
+    if model_type == "xgb" and registry.xgb_models is None:
+        raise HTTPException(503, "XGBoost model not loaded. Check that models/xgb_multitask.joblib exists.")
+    if model_type == "gnn" and registry.gnn_model is None:
+        raise HTTPException(503, "GNN model not loaded. Train it first with src/train_gnn.py or switch to XGBoost.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ROUTES
+# ROUTES — Meta
 # ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/", tags=["Meta"])
+def root():
+    """Root — confirms service is alive."""
+    return {
+        "service": "ToxPredict API",
+        "status":  "ok" if registry.ready else "loading",
+        "docs":    "/docs",
+        "health":  "/health",
+    }
+
 
 @app.get("/health", response_model=HealthResponse, tags=["Meta"])
 def health():
-    """Check API status and confirm which models are loaded."""
+    """Health check — shows which models are loaded."""
     return HealthResponse(
-        status     = "ok" if registry.xgb_models is not None else "loading",
+        status     = "ok" if registry.ready else "loading",
         xgb_loaded = registry.xgb_models is not None,
         gnn_loaded = registry.gnn_model  is not None,
         n_tasks    = len(TOX21_TASKS),
     )
 
 
-@app.get("/", tags=["Meta"])
-def root():
-    """Root endpoint — confirms API is alive (used by Render health check)."""
-    return {
-        "service": "ToxPredict API",
-        "status":  "ok",
-        "docs":    "/docs",
-        "health":  "/health",
-    }
-
-
 @app.get("/assays", response_model=List[AssayInfo], tags=["Meta"])
 def get_assays():
-    """Return metadata for all 12 Tox21 assay targets."""
+    """Metadata for all 12 Tox21 assay targets."""
     descriptions = {
-        "NR-AR":         "Measures activation of the androgen receptor — key in hormone-sensitive cancers",
-        "NR-AR-LBD":     "Tests binding to the androgen receptor ligand-binding domain",
-        "NR-AhR":        "Aryl hydrocarbon receptor activation — linked to dioxin-like toxicity",
-        "NR-Aromatase":  "Inhibition of aromatase enzyme affecting estrogen synthesis",
-        "NR-ER":         "Estrogen receptor activation — relevant to breast cancer risk",
-        "NR-ER-LBD":     "Binding to estrogen receptor ligand-binding domain",
-        "NR-PPAR-gamma": "PPAR-gamma receptor activation — metabolic and developmental effects",
-        "SR-ARE":        "Antioxidant response element — indicator of oxidative stress",
-        "SR-ATAD5":      "DNA damage / genotoxicity assay via ATAD5 upregulation",
-        "SR-HSE":        "Heat shock response — marker of protein misfolding stress",
-        "SR-MMP":        "Mitochondrial membrane potential disruption — mitochondrial toxicity",
-        "SR-p53":        "p53 tumour suppressor activation — DNA damage and cancer risk",
+        "NR-AR":         "Androgen receptor activation — hormone-sensitive cancers",
+        "NR-AR-LBD":     "Androgen receptor ligand-binding domain",
+        "NR-AhR":        "Aryl hydrocarbon receptor — dioxin-like toxicity",
+        "NR-Aromatase":  "Aromatase enzyme inhibition — estrogen synthesis",
+        "NR-ER":         "Estrogen receptor activation — breast cancer risk",
+        "NR-ER-LBD":     "Estrogen receptor ligand-binding domain",
+        "NR-PPAR-gamma": "PPAR-gamma receptor — metabolic effects",
+        "SR-ARE":        "Antioxidant response element — oxidative stress",
+        "SR-ATAD5":      "DNA damage / genotoxicity",
+        "SR-HSE":        "Heat shock response — protein stress",
+        "SR-MMP":        "Mitochondrial membrane potential disruption",
+        "SR-p53":        "p53 tumour suppressor — DNA damage / cancer",
     }
     return [
         AssayInfo(
@@ -365,230 +283,187 @@ def get_assays():
     ]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ROUTES — Prediction
+# ─────────────────────────────────────────────────────────────────────────────
+
 @app.post("/predict", response_model=PredictResponse, tags=["Prediction"])
 def predict(req: PredictRequest):
-    """
-    Predict toxicity for a single SMILES string.
-
-    - model='gnn'  → AttentiveFP GNN with atom attention heatmap
-    - model='xgb'  → XGBoost with SHAP feature importance
-
-    Returns probabilities for all 12 Tox21 assay targets.
-    """
-    # Guard: return 503 if models are still loading in background
-    if registry.xgb_models is None and registry.gnn_model is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Models are still loading. Please retry in a few seconds."
-        )
+    """Predict toxicity for a single SMILES string."""
+    _check_models_ready(req.model)
 
     smiles = req.smiles.strip()
-
-    # Validate SMILES before running model
     from rdkit import Chem
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        raise HTTPException(
-            status_code = 422,
-            detail      = f"Invalid SMILES string: '{smiles}'"
-        )
+    if Chem.MolFromSmiles(smiles) is None:
+        raise HTTPException(422, f"Invalid SMILES: '{smiles}'")
 
     try:
         if req.model == "gnn":
-            if registry.gnn_model is None:
-                raise HTTPException(503, "GNN model not loaded — train first")
-            return _predict_with_gnn(smiles)
+            return _predict_gnn(smiles)
         else:
-            return _predict_with_xgb(smiles)
-
+            return _predict_xgb(smiles)
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(422, str(e))
     except Exception as e:
         logger.error(f"Prediction error for '{smiles}': {e}")
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+        raise HTTPException(500, f"Prediction failed: {e}")
+
+
+def _predict_xgb(smiles: str) -> PredictResponse:
+    from train_xgb import predict_single
+    result        = predict_single(smiles, registry.xgb_models, registry.feat_names)
+    assay_results = _build_assay_results(result["predictions"])
+    n_toxic       = sum(1 for r in assay_results if r.toxic)
+
+    shap_feats: Dict[str, List[ShapFeature]] = {}
+    for task, feats in result.get("shap_top", {}).items():
+        shap_feats[task] = [ShapFeature(feature=f["feature"], shap_value=f["shap_value"]) for f in feats]
+
+    return PredictResponse(
+        smiles           = smiles,
+        canonical_smiles = _canonical(smiles),
+        model_used       = "xgb",
+        assay_results    = assay_results,
+        n_toxic          = n_toxic,
+        overall_risk     = _overall_risk(n_toxic, len(assay_results)),
+        shap_features    = shap_feats or None,
+        atom_attention   = None,
+    )
+
+
+def _predict_gnn(smiles: str) -> PredictResponse:
+    from train_gnn import predict_single_gnn
+    result        = predict_single_gnn(smiles, registry.gnn_model, registry.device)
+    assay_results = _build_assay_results(result["predictions"])
+    n_toxic       = sum(1 for r in assay_results if r.toxic)
+    atom_attn     = [AtomAttention(atom_idx=i, weight=round(w, 4))
+                     for i, w in enumerate(result.get("atom_attention", []))]
+    return PredictResponse(
+        smiles           = smiles,
+        canonical_smiles = _canonical(smiles),
+        model_used       = "gnn",
+        assay_results    = assay_results,
+        n_toxic          = n_toxic,
+        overall_risk     = _overall_risk(n_toxic, len(assay_results)),
+        shap_features    = None,
+        atom_attention   = atom_attn or None,
+    )
 
 
 @app.post("/batch", response_model=BatchPredictResponse, tags=["Prediction"])
 def batch_predict(req: BatchPredictRequest):
-    """
-    Predict toxicity for a list of SMILES strings (max 500).
-    Returns per-compound results and a list of any that failed.
-    """
-    results = []
-    failed  = []
-
+    """Batch predict for a list of SMILES (max 500)."""
+    results, failed = [], []
     for smiles in req.smiles_list:
-        smiles = smiles.strip()
         try:
-            single_req = PredictRequest(smiles=smiles, model=req.model)
-            result     = predict(single_req)
-            results.append(result)
-        except HTTPException:
-            failed.append(smiles)
+            results.append(predict(PredictRequest(smiles=smiles.strip(), model=req.model)))
         except Exception:
             failed.append(smiles)
-
     return BatchPredictResponse(
-        total   = len(req.smiles_list),
-        valid   = len(results),
-        invalid = len(failed),
-        results = results,
-        failed  = failed,
+        total=len(req.smiles_list), valid=len(results),
+        invalid=len(failed), results=results, failed=failed,
     )
 
 
 @app.post("/upload-batch", response_model=BatchPredictResponse, tags=["Prediction"])
-async def upload_batch(
-    file:  UploadFile = File(...),
-    model: str        = "gnn",
-):
-    """
-    Upload a CSV file with a 'smiles' column for batch prediction.
-    Returns predictions for all valid compounds in the file.
-    """
-    import pandas as pd
-    import io
-
+async def upload_batch(file: UploadFile = File(...), model: str = "xgb"):
+    """Upload CSV with a 'smiles' column for batch prediction."""
+    import pandas as pd, io
     if not file.filename.endswith(".csv"):
         raise HTTPException(400, "Only CSV files are supported")
-
     content = await file.read()
     try:
         df = pd.read_csv(io.BytesIO(content))
     except Exception as e:
         raise HTTPException(400, f"Could not parse CSV: {e}")
 
-    smiles_col = None
-    for candidate in ["smiles", "SMILES", "Smiles", "canonical_smiles"]:
-        if candidate in df.columns:
-            smiles_col = candidate
-            break
-
+    smiles_col = next(
+        (c for c in ["smiles","SMILES","Smiles","canonical_smiles"] if c in df.columns), None
+    )
     if smiles_col is None:
-        raise HTTPException(
-            400,
-            "CSV must have a column named 'smiles' (case-insensitive)"
-        )
+        raise HTTPException(400, "CSV must have a column named 'smiles'")
 
     smiles_list = df[smiles_col].dropna().astype(str).tolist()
     if len(smiles_list) > 500:
-        raise HTTPException(400, "Maximum 500 compounds per batch upload")
+        raise HTTPException(400, "Maximum 500 compounds per batch")
 
-    req = BatchPredictRequest(smiles_list=smiles_list, model=model)
-    return batch_predict(req)
-
+    return batch_predict(BatchPredictRequest(smiles_list=smiles_list, model=model))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# STEP 7  —  VISUALIZATION ENDPOINTS
+# ROUTES — Visualization
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/viz/shap-summary", tags=["Visualization"])
 def shap_summary():
-    """
-    Pre-computed SHAP top-N features for all 12 assays.
-    Frontend uses this to render the global feature importance bar chart.
-    """
     if registry.top_features is None:
-        raise HTTPException(503, "SHAP summary not available — run train_xgb.py first")
+        raise HTTPException(503, "SHAP summary not available")
     return registry.top_features
 
 
 @app.post("/viz/shap-compound", tags=["Visualization"])
 def shap_compound(req: PredictRequest):
-    """
-    Per-compound SHAP values for a single SMILES using XGBoost.
-    Returns top-N influential features per assay with signed SHAP values.
-    Frontend uses this to render per-compound SHAP bar charts.
-    """
-    if registry.xgb_models is None:
-        raise HTTPException(503, "XGBoost model not loaded")
-    if registry.feat_names is None:
-        raise HTTPException(503, "Feature names not loaded")
-
+    _check_models_ready("xgb")
     from rdkit import Chem
     smiles = req.smiles.strip()
     if Chem.MolFromSmiles(smiles) is None:
         raise HTTPException(422, f"Invalid SMILES: '{smiles}'")
-
     try:
         from train_xgb import predict_single
         result = predict_single(smiles, registry.xgb_models, registry.feat_names)
         return {"smiles": smiles, "shap_by_task": result.get("shap_top", {})}
     except Exception as e:
-        raise HTTPException(500, f"SHAP computation failed: {e}")
+        raise HTTPException(500, f"SHAP failed: {e}")
 
 
 @app.get("/viz/training-curve", tags=["Visualization"])
 def training_curve():
-    """
-    GNN training loss curve — epoch vs train_loss vs val_loss vs mean_val_auc.
-    Frontend uses this to render the training progress chart.
-    """
     log_path = MODELS_DIR / "gnn_training_log.json"
     if not log_path.exists():
-        raise HTTPException(503, "Training log not found — run train_gnn.py first")
-
+        raise HTTPException(503, "Training log not found")
     with open(log_path) as f:
         log = json.load(f)
-
     return {
         "epochs":       [e["epoch"]        for e in log],
         "train_loss":   [e["train_loss"]   for e in log],
-        "val_loss":     [e["val_loss"]      for e in log],
+        "val_loss":     [e["val_loss"]     for e in log],
         "mean_val_auc": [e["mean_val_auc"] for e in log],
     }
 
 
 @app.get("/viz/model-results", tags=["Visualization"])
 def model_results():
-    """
-    Test-set AUC/AUPRC/F1 for both XGBoost and GNN side by side.
-    Frontend uses this for the model comparison table.
-    """
     import pandas as pd
-
     def _load(path):
-        if not path.exists():
-            return {}
+        if not path.exists(): return {}
         df = pd.read_csv(path)
         return {
             row["task"]: {
-                "roc_auc": float(row["roc_auc"]) if not pd.isna(row["roc_auc"]) else None,
-                "auprc":   float(row["auprc"])   if not pd.isna(row["auprc"])   else None,
-                "f1":      float(row["f1"])       if not pd.isna(row["f1"])       else None,
+                "roc_auc": None if pd.isna(row["roc_auc"]) else float(row["roc_auc"]),
+                "auprc":   None if pd.isna(row["auprc"])   else float(row["auprc"]),
+                "f1":      None if pd.isna(row["f1"])       else float(row["f1"]),
             }
             for _, row in df.iterrows()
         }
-
     xgb_r = _load(MODELS_DIR / "xgb_results.csv")
-    gnn_r  = _load(MODELS_DIR / "gnn_results.csv")
-
+    gnn_r = _load(MODELS_DIR / "gnn_results.csv")
     if not xgb_r and not gnn_r:
-        raise HTTPException(503, "No results found — run training scripts first")
-
+        raise HTTPException(503, "No results found")
     return {"tasks": TOX21_TASKS, "xgb": xgb_r, "gnn": gnn_r}
 
 
 @app.get("/viz/dataset-stats", tags=["Visualization"])
 def dataset_stats():
-    """
-    Class imbalance stats for all 12 assays — toxic vs non-toxic counts.
-    Frontend uses this for the EDA bar chart.
-    """
     import pandas as pd
     from config import TOX21_CSV
-
     if not TOX21_CSV.exists():
-        raise HTTPException(503, "tox21.csv not found in data/")
-
+        raise HTTPException(503, "tox21.csv not found")
     df = pd.read_csv(TOX21_CSV)
     stats = []
     for task in TOX21_TASKS:
-        if task not in df.columns:
-            continue
+        if task not in df.columns: continue
         col = df[task]
         n_valid = col.notna().sum()
         n_pos   = int((col == 1).sum())
@@ -603,18 +478,3 @@ def dataset_stats():
             "positive_rate": round(n_pos / n_valid, 4) if n_valid > 0 else 0,
         })
     return {"tasks": TOX21_TASKS, "stats": stats}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# RUN DIRECTLY  —  python api/main.py
-# ─────────────────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    import uvicorn
-    from config import API_HOST, API_PORT
-
-    uvicorn.run(
-        "api.main:app",
-        host    = API_HOST,
-        port    = API_PORT,
-        reload  = True,
-    )

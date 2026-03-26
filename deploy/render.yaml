@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: toxpredict-api
+    runtime: python
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: python run.py
+    plan: free
