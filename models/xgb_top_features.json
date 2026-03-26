@@ -1,0 +1,746 @@
+{
+  "NR-AR": [
+    {
+      "feature": "NumAliphaticRings",
+      "mean_abs_shap": 0.270588
+    },
+    {
+      "feature": "BertzCT",
+      "mean_abs_shap": 0.255403
+    },
+    {
+      "feature": "Chi3v",
+      "mean_abs_shap": 0.244538
+    },
+    {
+      "feature": "HallKierAlpha",
+      "mean_abs_shap": 0.236553
+    },
+    {
+      "feature": "EState_VSA7",
+      "mean_abs_shap": 0.205738
+    },
+    {
+      "feature": "EState_VSA8",
+      "mean_abs_shap": 0.201913
+    },
+    {
+      "feature": "VSA_EState4",
+      "mean_abs_shap": 0.20105
+    },
+    {
+      "feature": "EState_VSA5",
+      "mean_abs_shap": 0.198949
+    },
+    {
+      "feature": "Kappa2",
+      "mean_abs_shap": 0.190897
+    },
+    {
+      "feature": "SlogP_VSA3",
+      "mean_abs_shap": 0.185492
+    },
+    {
+      "feature": "Chi3n",
+      "mean_abs_shap": 0.180679
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.163804
+    },
+    {
+      "feature": "EState_VSA4",
+      "mean_abs_shap": 0.163764
+    },
+    {
+      "feature": "SMR_VSA5",
+      "mean_abs_shap": 0.162316
+    },
+    {
+      "feature": "BalabanJ",
+      "mean_abs_shap": 0.161629
+    }
+  ],
+  "NR-AR-LBD": [
+    {
+      "feature": "EState_VSA6",
+      "mean_abs_shap": 0.554939
+    },
+    {
+      "feature": "EState_VSA5",
+      "mean_abs_shap": 0.424638
+    },
+    {
+      "feature": "Chi3v",
+      "mean_abs_shap": 0.384631
+    },
+    {
+      "feature": "SMR_VSA3",
+      "mean_abs_shap": 0.377599
+    },
+    {
+      "feature": "BalabanJ",
+      "mean_abs_shap": 0.348702
+    },
+    {
+      "feature": "Chi4v",
+      "mean_abs_shap": 0.331637
+    },
+    {
+      "feature": "HallKierAlpha",
+      "mean_abs_shap": 0.320712
+    },
+    {
+      "feature": "PEOE_VSA6",
+      "mean_abs_shap": 0.304136
+    },
+    {
+      "feature": "VSA_EState5",
+      "mean_abs_shap": 0.289063
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.276623
+    },
+    {
+      "feature": "MinAbsPartialCharge",
+      "mean_abs_shap": 0.262974
+    },
+    {
+      "feature": "SlogP_VSA4",
+      "mean_abs_shap": 0.261641
+    },
+    {
+      "feature": "EState_VSA2",
+      "mean_abs_shap": 0.258978
+    },
+    {
+      "feature": "SlogP_VSA1",
+      "mean_abs_shap": 0.231766
+    },
+    {
+      "feature": "VSA_EState4",
+      "mean_abs_shap": 0.229866
+    }
+  ],
+  "NR-AhR": [
+    {
+      "feature": "FractionCSP3",
+      "mean_abs_shap": 0.531519
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.499603
+    },
+    {
+      "feature": "NumAromaticRings",
+      "mean_abs_shap": 0.351655
+    },
+    {
+      "feature": "SlogP_VSA3",
+      "mean_abs_shap": 0.21013
+    },
+    {
+      "feature": "PEOE_VSA6",
+      "mean_abs_shap": 0.19855
+    },
+    {
+      "feature": "SlogP_VSA1",
+      "mean_abs_shap": 0.187249
+    },
+    {
+      "feature": "Morgan_bit_389",
+      "mean_abs_shap": 0.178412
+    },
+    {
+      "feature": "SlogP_VSA2",
+      "mean_abs_shap": 0.168032
+    },
+    {
+      "feature": "VSA_EState4",
+      "mean_abs_shap": 0.167892
+    },
+    {
+      "feature": "Kappa3",
+      "mean_abs_shap": 0.163776
+    },
+    {
+      "feature": "TPSA",
+      "mean_abs_shap": 0.143202
+    },
+    {
+      "feature": "EState_VSA5",
+      "mean_abs_shap": 0.141395
+    },
+    {
+      "feature": "BertzCT",
+      "mean_abs_shap": 0.139374
+    },
+    {
+      "feature": "SMR_VSA5",
+      "mean_abs_shap": 0.128603
+    },
+    {
+      "feature": "NumHAcceptors",
+      "mean_abs_shap": 0.127235
+    }
+  ],
+  "NR-Aromatase": [
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.643385
+    },
+    {
+      "feature": "EState_VSA2",
+      "mean_abs_shap": 0.419421
+    },
+    {
+      "feature": "SlogP_VSA2",
+      "mean_abs_shap": 0.379312
+    },
+    {
+      "feature": "VSA_EState2",
+      "mean_abs_shap": 0.322794
+    },
+    {
+      "feature": "EState_VSA9",
+      "mean_abs_shap": 0.320446
+    },
+    {
+      "feature": "MinAbsPartialCharge",
+      "mean_abs_shap": 0.276312
+    },
+    {
+      "feature": "EState_VSA3",
+      "mean_abs_shap": 0.273918
+    },
+    {
+      "feature": "MolMR",
+      "mean_abs_shap": 0.271308
+    },
+    {
+      "feature": "MolWt",
+      "mean_abs_shap": 0.256279
+    },
+    {
+      "feature": "BertzCT",
+      "mean_abs_shap": 0.254545
+    },
+    {
+      "feature": "HallKierAlpha",
+      "mean_abs_shap": 0.216485
+    },
+    {
+      "feature": "EState_VSA4",
+      "mean_abs_shap": 0.19363
+    },
+    {
+      "feature": "SlogP_VSA4",
+      "mean_abs_shap": 0.180689
+    },
+    {
+      "feature": "EState_VSA7",
+      "mean_abs_shap": 0.176401
+    },
+    {
+      "feature": "fr_NH1",
+      "mean_abs_shap": 0.176305
+    }
+  ],
+  "NR-ER": [
+    {
+      "feature": "BalabanJ",
+      "mean_abs_shap": 0.310316
+    },
+    {
+      "feature": "SlogP_VSA2",
+      "mean_abs_shap": 0.283919
+    },
+    {
+      "feature": "BertzCT",
+      "mean_abs_shap": 0.206218
+    },
+    {
+      "feature": "Morgan_bit_1145",
+      "mean_abs_shap": 0.192405
+    },
+    {
+      "feature": "EState_VSA3",
+      "mean_abs_shap": 0.177411
+    },
+    {
+      "feature": "SlogP_VSA3",
+      "mean_abs_shap": 0.156245
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.143251
+    },
+    {
+      "feature": "SMR_VSA3",
+      "mean_abs_shap": 0.124967
+    },
+    {
+      "feature": "VSA_EState5",
+      "mean_abs_shap": 0.119371
+    },
+    {
+      "feature": "MolMR",
+      "mean_abs_shap": 0.118258
+    },
+    {
+      "feature": "MinPartialCharge",
+      "mean_abs_shap": 0.115279
+    },
+    {
+      "feature": "EState_VSA8",
+      "mean_abs_shap": 0.09702
+    },
+    {
+      "feature": "Kappa2",
+      "mean_abs_shap": 0.096674
+    },
+    {
+      "feature": "EState_VSA5",
+      "mean_abs_shap": 0.092615
+    },
+    {
+      "feature": "VSA_EState1",
+      "mean_abs_shap": 0.077465
+    }
+  ],
+  "NR-ER-LBD": [
+    {
+      "feature": "BalabanJ",
+      "mean_abs_shap": 0.391137
+    },
+    {
+      "feature": "SlogP_VSA2",
+      "mean_abs_shap": 0.315103
+    },
+    {
+      "feature": "EState_VSA4",
+      "mean_abs_shap": 0.300351
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.292332
+    },
+    {
+      "feature": "VSA_EState1",
+      "mean_abs_shap": 0.281946
+    },
+    {
+      "feature": "EState_VSA3",
+      "mean_abs_shap": 0.27521
+    },
+    {
+      "feature": "EState_VSA9",
+      "mean_abs_shap": 0.218781
+    },
+    {
+      "feature": "MinPartialCharge",
+      "mean_abs_shap": 0.200733
+    },
+    {
+      "feature": "MolWt",
+      "mean_abs_shap": 0.198706
+    },
+    {
+      "feature": "SlogP_VSA1",
+      "mean_abs_shap": 0.197701
+    },
+    {
+      "feature": "VSA_EState5",
+      "mean_abs_shap": 0.191838
+    },
+    {
+      "feature": "Chi4v",
+      "mean_abs_shap": 0.189547
+    },
+    {
+      "feature": "EState_VSA8",
+      "mean_abs_shap": 0.186003
+    },
+    {
+      "feature": "VSA_EState4",
+      "mean_abs_shap": 0.182254
+    },
+    {
+      "feature": "HallKierAlpha",
+      "mean_abs_shap": 0.182087
+    }
+  ],
+  "NR-PPAR-gamma": [
+    {
+      "feature": "VSA_EState5",
+      "mean_abs_shap": 0.441136
+    },
+    {
+      "feature": "EState_VSA5",
+      "mean_abs_shap": 0.41638
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.393737
+    },
+    {
+      "feature": "SMR_VSA5",
+      "mean_abs_shap": 0.375412
+    },
+    {
+      "feature": "VSA_EState3",
+      "mean_abs_shap": 0.351949
+    },
+    {
+      "feature": "SlogP_VSA2",
+      "mean_abs_shap": 0.342204
+    },
+    {
+      "feature": "Chi3v",
+      "mean_abs_shap": 0.333329
+    },
+    {
+      "feature": "PEOE_VSA2",
+      "mean_abs_shap": 0.328596
+    },
+    {
+      "feature": "SMR_VSA3",
+      "mean_abs_shap": 0.315941
+    },
+    {
+      "feature": "SMR_VSA4",
+      "mean_abs_shap": 0.309581
+    },
+    {
+      "feature": "EState_VSA4",
+      "mean_abs_shap": 0.299006
+    },
+    {
+      "feature": "ExactMolWt",
+      "mean_abs_shap": 0.281811
+    },
+    {
+      "feature": "VSA_EState1",
+      "mean_abs_shap": 0.245408
+    },
+    {
+      "feature": "MolWt",
+      "mean_abs_shap": 0.238746
+    },
+    {
+      "feature": "TPSA",
+      "mean_abs_shap": 0.236107
+    }
+  ],
+  "SR-ARE": [
+    {
+      "feature": "BertzCT",
+      "mean_abs_shap": 0.41031
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.371083
+    },
+    {
+      "feature": "SMR_VSA5",
+      "mean_abs_shap": 0.302681
+    },
+    {
+      "feature": "MolWt",
+      "mean_abs_shap": 0.245234
+    },
+    {
+      "feature": "SMR_VSA3",
+      "mean_abs_shap": 0.171792
+    },
+    {
+      "feature": "ExactMolWt",
+      "mean_abs_shap": 0.153685
+    },
+    {
+      "feature": "EState_VSA5",
+      "mean_abs_shap": 0.147714
+    },
+    {
+      "feature": "MaxPartialCharge",
+      "mean_abs_shap": 0.1306
+    },
+    {
+      "feature": "VSA_EState1",
+      "mean_abs_shap": 0.122566
+    },
+    {
+      "feature": "EState_VSA4",
+      "mean_abs_shap": 0.122143
+    },
+    {
+      "feature": "SlogP_VSA3",
+      "mean_abs_shap": 0.113968
+    },
+    {
+      "feature": "EState_VSA7",
+      "mean_abs_shap": 0.106139
+    },
+    {
+      "feature": "HallKierAlpha",
+      "mean_abs_shap": 0.103451
+    },
+    {
+      "feature": "TPSA",
+      "mean_abs_shap": 0.102856
+    },
+    {
+      "feature": "EState_VSA8",
+      "mean_abs_shap": 0.101673
+    }
+  ],
+  "SR-ATAD5": [
+    {
+      "feature": "SMR_VSA5",
+      "mean_abs_shap": 0.680772
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.356562
+    },
+    {
+      "feature": "HallKierAlpha",
+      "mean_abs_shap": 0.31433
+    },
+    {
+      "feature": "FractionCSP3",
+      "mean_abs_shap": 0.294648
+    },
+    {
+      "feature": "EState_VSA5",
+      "mean_abs_shap": 0.285634
+    },
+    {
+      "feature": "EState_VSA7",
+      "mean_abs_shap": 0.276337
+    },
+    {
+      "feature": "SlogP_VSA3",
+      "mean_abs_shap": 0.254176
+    },
+    {
+      "feature": "TPSA",
+      "mean_abs_shap": 0.251839
+    },
+    {
+      "feature": "VSA_EState1",
+      "mean_abs_shap": 0.245564
+    },
+    {
+      "feature": "PEOE_VSA6",
+      "mean_abs_shap": 0.242077
+    },
+    {
+      "feature": "BalabanJ",
+      "mean_abs_shap": 0.23679
+    },
+    {
+      "feature": "VSA_EState5",
+      "mean_abs_shap": 0.22333
+    },
+    {
+      "feature": "MolWt",
+      "mean_abs_shap": 0.223255
+    },
+    {
+      "feature": "VSA_EState2",
+      "mean_abs_shap": 0.222215
+    },
+    {
+      "feature": "MaxPartialCharge",
+      "mean_abs_shap": 0.219968
+    }
+  ],
+  "SR-HSE": [
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.625661
+    },
+    {
+      "feature": "SlogP_VSA2",
+      "mean_abs_shap": 0.432142
+    },
+    {
+      "feature": "VSA_EState1",
+      "mean_abs_shap": 0.27742
+    },
+    {
+      "feature": "SMR_VSA3",
+      "mean_abs_shap": 0.261221
+    },
+    {
+      "feature": "VSA_EState5",
+      "mean_abs_shap": 0.226829
+    },
+    {
+      "feature": "EState_VSA9",
+      "mean_abs_shap": 0.221031
+    },
+    {
+      "feature": "VSA_EState4",
+      "mean_abs_shap": 0.215362
+    },
+    {
+      "feature": "MinPartialCharge",
+      "mean_abs_shap": 0.203529
+    },
+    {
+      "feature": "TPSA",
+      "mean_abs_shap": 0.175683
+    },
+    {
+      "feature": "PEOE_VSA2",
+      "mean_abs_shap": 0.175179
+    },
+    {
+      "feature": "Chi3v",
+      "mean_abs_shap": 0.172558
+    },
+    {
+      "feature": "MolWt",
+      "mean_abs_shap": 0.167475
+    },
+    {
+      "feature": "EState_VSA3",
+      "mean_abs_shap": 0.155651
+    },
+    {
+      "feature": "EState_VSA4",
+      "mean_abs_shap": 0.148826
+    },
+    {
+      "feature": "ExactMolWt",
+      "mean_abs_shap": 0.141681
+    }
+  ],
+  "SR-MMP": [
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.981168
+    },
+    {
+      "feature": "SMR_VSA3",
+      "mean_abs_shap": 0.57752
+    },
+    {
+      "feature": "SlogP_VSA2",
+      "mean_abs_shap": 0.296038
+    },
+    {
+      "feature": "BertzCT",
+      "mean_abs_shap": 0.260474
+    },
+    {
+      "feature": "SlogP_VSA3",
+      "mean_abs_shap": 0.248149
+    },
+    {
+      "feature": "HallKierAlpha",
+      "mean_abs_shap": 0.221557
+    },
+    {
+      "feature": "FractionCSP3",
+      "mean_abs_shap": 0.209443
+    },
+    {
+      "feature": "EState_VSA4",
+      "mean_abs_shap": 0.179534
+    },
+    {
+      "feature": "Chi2v",
+      "mean_abs_shap": 0.175279
+    },
+    {
+      "feature": "MolMR",
+      "mean_abs_shap": 0.174234
+    },
+    {
+      "feature": "SMR_VSA1",
+      "mean_abs_shap": 0.158329
+    },
+    {
+      "feature": "VSA_EState1",
+      "mean_abs_shap": 0.156646
+    },
+    {
+      "feature": "MinPartialCharge",
+      "mean_abs_shap": 0.144217
+    },
+    {
+      "feature": "VSA_EState3",
+      "mean_abs_shap": 0.131889
+    },
+    {
+      "feature": "Morgan_bit_389",
+      "mean_abs_shap": 0.129207
+    }
+  ],
+  "SR-p53": [
+    {
+      "feature": "BertzCT",
+      "mean_abs_shap": 0.443533
+    },
+    {
+      "feature": "SMR_VSA3",
+      "mean_abs_shap": 0.358042
+    },
+    {
+      "feature": "ExactMolWt",
+      "mean_abs_shap": 0.352089
+    },
+    {
+      "feature": "MolLogP",
+      "mean_abs_shap": 0.335313
+    },
+    {
+      "feature": "MolWt",
+      "mean_abs_shap": 0.265858
+    },
+    {
+      "feature": "SMR_VSA5",
+      "mean_abs_shap": 0.223408
+    },
+    {
+      "feature": "HallKierAlpha",
+      "mean_abs_shap": 0.215826
+    },
+    {
+      "feature": "EState_VSA5",
+      "mean_abs_shap": 0.210522
+    },
+    {
+      "feature": "EState_VSA2",
+      "mean_abs_shap": 0.207563
+    },
+    {
+      "feature": "EState_VSA9",
+      "mean_abs_shap": 0.173083
+    },
+    {
+      "feature": "MinPartialCharge",
+      "mean_abs_shap": 0.171708
+    },
+    {
+      "feature": "SlogP_VSA3",
+      "mean_abs_shap": 0.168741
+    },
+    {
+      "feature": "EState_VSA6",
+      "mean_abs_shap": 0.167119
+    },
+    {
+      "feature": "MaxAbsPartialCharge",
+      "mean_abs_shap": 0.162508
+    },
+    {
+      "feature": "EState_VSA4",
+      "mean_abs_shap": 0.160347
+    }
+  ]
+}
