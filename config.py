@@ -94,9 +94,10 @@ XGB_MODEL_PATH = MODELS_DIR / "xgb_multitask.joblib"
 GNN_MODEL_PATH = MODELS_DIR / "attentivefp.pt"
 
 # ── API settings ──────────────────────────────────────────────────────────────
-API_HOST  = "0.0.0.0"
-API_PORT  = 8000
-API_TITLE = "ToxPredict API"
+import os as _os
+API_HOST    = "0.0.0.0"
+API_PORT    = int(_os.environ.get("PORT", 8000))
+API_TITLE   = "ToxPredict API"
 API_VERSION = "1.0.0"
 
 # Risk threshold for classifying a compound as toxic
