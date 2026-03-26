@@ -140,11 +140,24 @@ def _load_gnn():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load models on startup. Nothing to clean up on shutdown."""
-    logger.info("Starting ToxPredict API — loading models...")
-    _load_xgb()
-    _load_gnn()
-    logger.info("Models ready. API is live.")
+    """
+    Load models in a background thread so the port binds immediately.
+    Render.com times out if startup blocks the port for > 60s.
+    Models will be ready within a few seconds of the first request.
+    """
+    import threading
+    logger.info("ToxPredict API starting — port binding now...")
+
+    def _load_all():
+        logger.info("Background: loading models...")
+        _load_xgb()
+        _load_gnn()
+        logger.info("Background: all models ready.")
+
+    t = threading.Thread(target=_load_all, daemon=True)
+    t.start()
+
+    logger.info("Port bound. Models loading in background.")
     yield
     logger.info("Shutting down ToxPredict API.")
 
@@ -306,11 +319,22 @@ def _predict_with_xgb(smiles: str) -> PredictResponse:
 def health():
     """Check API status and confirm which models are loaded."""
     return HealthResponse(
-        status     = "ok",
+        status     = "ok" if registry.xgb_models is not None else "loading",
         xgb_loaded = registry.xgb_models is not None,
         gnn_loaded = registry.gnn_model  is not None,
         n_tasks    = len(TOX21_TASKS),
     )
+
+
+@app.get("/", tags=["Meta"])
+def root():
+    """Root endpoint — confirms API is alive (used by Render health check)."""
+    return {
+        "service": "ToxPredict API",
+        "status":  "ok",
+        "docs":    "/docs",
+        "health":  "/health",
+    }
 
 
 @app.get("/assays", response_model=List[AssayInfo], tags=["Meta"])
@@ -351,6 +375,13 @@ def predict(req: PredictRequest):
 
     Returns probabilities for all 12 Tox21 assay targets.
     """
+    # Guard: return 503 if models are still loading in background
+    if registry.xgb_models is None and registry.gnn_model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Models are still loading. Please retry in a few seconds."
+        )
+
     smiles = req.smiles.strip()
 
     # Validate SMILES before running model
