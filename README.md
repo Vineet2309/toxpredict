@@ -9,6 +9,7 @@
 
 ToxPredict takes a **SMILES string** (a text representation of any chemical compound) and predicts its toxicity probability across **12 biological assay targets** from the Tox21 dataset. It tells you *which molecular features* are driving the toxicity risk using SHAP values, and highlights *which atoms* on the molecule are responsible using GNN attention weights.
 
+working link: https://toxpredict-vzep.onrender.com/
 ---
 
 ## Tech stack
